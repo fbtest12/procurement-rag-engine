@@ -1,0 +1,119 @@
+REQUEST FOR PROPOSAL (RFP) NO. 2026-IT-0042
+CITY OF WESTFIELD — INFORMATION TECHNOLOGY MANAGED SERVICES
+
+DATE ISSUED: January 15, 2026
+DUE DATE: March 1, 2026 at 2:00 PM EST
+CONTACT: Maria Chen, Procurement Officer
+EMAIL: procurement@westfield.gov
+
+SECTION 1: PURPOSE AND OVERVIEW
+
+1.1 The City of Westfield ("City") is seeking proposals from qualified firms to provide comprehensive Information Technology Managed Services for all City departments. This contract will replace the existing IT services agreement expiring June 30, 2026.
+
+1.2 The estimated annual budget for this engagement is $1,200,000 to $1,800,000, depending on service levels proposed.
+
+1.3 The City serves a population of 85,000 residents and employs approximately 650 full-time staff across 12 departments.
+
+SECTION 2: SCOPE OF WORK
+
+2.1 General Requirements
+The selected vendor shall provide the following core services:
+- 24/7 help desk support with guaranteed response times
+- Network infrastructure management and monitoring
+- Cybersecurity operations including threat detection and incident response
+- Cloud infrastructure management (Azure and AWS environments)
+- End-user device management for approximately 800 workstations
+- Backup and disaster recovery services
+- Quarterly technology assessments and strategic planning
+
+2.2 Service Level Agreements (SLAs)
+The vendor must maintain the following minimum SLAs:
+- Critical system outage response: 15 minutes
+- High priority ticket resolution: 4 hours
+- Standard ticket resolution: 24 hours
+- Network uptime: 99.95%
+- Help desk first-call resolution rate: 70%
+
+2.3 Cybersecurity Requirements
+The vendor shall implement and maintain:
+- 24/7 Security Operations Center (SOC) monitoring
+- SIEM deployment and management
+- Endpoint Detection and Response (EDR) on all managed devices
+- Annual penetration testing and vulnerability assessments
+- Security awareness training for all City employees
+- Compliance with CJIS, HIPAA, and PCI-DSS where applicable
+
+SECTION 3: PROPOSAL SUBMISSION REQUIREMENTS
+
+3.1 Format
+Proposals must be submitted in the following format:
+- One (1) original and five (5) copies in sealed envelopes
+- One (1) electronic copy on USB drive in PDF format
+- Maximum of 50 pages excluding appendices
+- 12-point font, single-spaced
+
+3.2 Required Components
+Each proposal must include:
+a) Executive Summary (2 pages maximum)
+b) Company Qualifications and Experience
+c) Technical Approach and Methodology
+d) Staffing Plan with Key Personnel Resumes
+e) Three (3) references from similar government engagements
+f) Detailed pricing using the Cost Proposal Form (Attachment A)
+g) Proof of insurance per Section 7
+h) Signed Addenda Acknowledgment
+
+3.3 Submission Deadline
+All proposals must be received by March 1, 2026 at 2:00 PM EST. Late proposals will not be accepted regardless of cause.
+
+SECTION 4: EVALUATION CRITERIA
+
+Proposals will be evaluated based on the following criteria:
+
+4.1 Technical Approach and Methodology     35 points
+4.2 Company Qualifications and Experience  25 points
+4.3 Staffing and Key Personnel             15 points
+4.4 Cost Proposal                          20 points
+4.5 MBE/WBE Participation Plan              5 points
+                                   TOTAL: 100 points
+
+A minimum score of 70 points is required for consideration.
+
+SECTION 5: MBE/WBE PARTICIPATION
+
+5.1 The City has established a goal of 20% Minority Business Enterprise (MBE) and 10% Women Business Enterprise (WBE) participation for this contract.
+
+5.2 Proposers must submit a detailed MBE/WBE Participation Plan identifying subcontractors, their certification numbers, and the percentage of work to be performed.
+
+5.3 Good faith efforts documentation is required if the participation goals cannot be met.
+
+SECTION 6: CONTRACT TERMS
+
+6.1 The initial contract term shall be three (3) years commencing July 1, 2026.
+
+6.2 The City reserves the right to extend the contract for up to two (2) additional one-year periods upon mutual agreement.
+
+6.3 Either party may terminate the agreement with 90 days written notice.
+
+6.4 The contract is subject to annual appropriation by the City Council.
+
+SECTION 7: INSURANCE REQUIREMENTS
+
+The selected vendor must maintain the following insurance coverage:
+- Commercial General Liability: $2,000,000 per occurrence / $5,000,000 aggregate
+- Professional Liability (E&O): $5,000,000 per claim
+- Cyber Liability: $10,000,000 per occurrence
+- Workers Compensation: Statutory limits
+- Commercial Auto Liability: $1,000,000 combined single limit
+
+The City of Westfield must be named as Additional Insured on all policies.
+
+SECTION 8: PAYMENT TERMS
+
+8.1 Payment shall be made monthly in arrears upon receipt of itemized invoices.
+
+8.2 The City's standard payment terms are Net 30 days from receipt of approved invoice.
+
+8.3 Invoices must reference the purchase order number and contract number.
+
+8.4 The vendor shall submit monthly service reports with each invoice documenting SLA performance.

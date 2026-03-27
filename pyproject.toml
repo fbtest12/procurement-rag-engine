@@ -1,0 +1,14 @@
+[project]
+name = "procurement-rag-engine"
+version = "1.0.0"
+description = "AI-powered RAG system for government procurement document Q&A"
+requires-python = ">=3.10"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+addopts = "-v --tb=short"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"

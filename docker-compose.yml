@@ -1,0 +1,18 @@
+version: "3.8"
+
+services:
+  rag-api:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      - chroma-data:/app/data/chromadb
+      - ./data/sample_docs:/app/data/sample_docs
+    restart: unless-stopped
+    environment:
+      - LOG_LEVEL=INFO
+
+volumes:
+  chroma-data:

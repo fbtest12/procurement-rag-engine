@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -v \"^$\")",
+      "Bash(.venv/Scripts/python -m scripts.ingest_sample_docs)",
+      "Bash(curl -s -X POST http://localhost:8000/query -H \"Content-Type: application/json\" -d '{\"\"query\"\": \"\"What are the DBE participation requirements?\"\"}')"
+    ]
+  }
+}
