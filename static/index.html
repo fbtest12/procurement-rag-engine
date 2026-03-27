@@ -1,0 +1,1645 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Procurement RAG Engine</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg-base:       #0a0e17;
+  --bg-surface:    #0f1521;
+  --bg-elevated:   #161d2e;
+  --bg-input:      #1a2236;
+  --border:        #1e2d45;
+  --border-bright: #2a3f5f;
+  --accent:        #3b82f6;
+  --accent-dim:    #1d4ed8;
+  --accent-glow:   rgba(59,130,246,0.12);
+  --teal:          #14b8a6;
+  --teal-dim:      rgba(20,184,166,0.12);
+  --amber:         #f59e0b;
+  --amber-dim:     rgba(245,158,11,0.12);
+  --red:           #ef4444;
+  --red-dim:       rgba(239,68,68,0.12);
+  --green:         #22c55e;
+  --green-dim:     rgba(34,197,94,0.12);
+  --text-primary:  #e2e8f0;
+  --text-secondary:#94a3b8;
+  --text-muted:    #475569;
+  --text-code:     #7dd3fc;
+  --font-sans:     'IBM Plex Sans', system-ui, sans-serif;
+  --font-mono:     'IBM Plex Mono', 'Cascadia Code', monospace;
+}
+
+html, body {
+  height: 100%;
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  overflow: hidden;
+}
+
+/* ── Scrollbar ─────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-bright); border-radius: 3px; }
+
+/* ── Layout ────────────────────────────────────── */
+#app {
+  display: grid;
+  grid-template-rows: 56px 1fr;
+  height: 100vh;
+}
+
+#header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-surface);
+  z-index: 10;
+}
+
+#main {
+  display: grid;
+  grid-template-columns: 240px 1fr 260px;
+  overflow: hidden;
+}
+
+.panel {
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+  padding: 16px;
+}
+.panel:last-child { border-right: none; }
+
+/* ── Header ────────────────────────────────────── */
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.logo-icon {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+}
+.logo-text {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--text-primary);
+}
+.version-badge {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  padding: 1px 6px;
+  border-radius: 3px;
+  margin-left: 4px;
+}
+
+#header-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  flex-shrink: 0;
+}
+.status-dot.healthy { background: var(--green); animation: pulse-dot 2s ease-in-out infinite; }
+.status-dot.error   { background: var(--red); }
+.status-dot.unknown { background: var(--amber); animation: pulse-dot 3s ease-in-out infinite; }
+
+@keyframes pulse-dot {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50%       { transform: scale(1.4); opacity: 0.7; }
+}
+
+/* ── Section labels ─────────────────────────────── */
+.panel-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+}
+
+.divider {
+  height: 1px;
+  background: var(--border);
+  margin: 16px 0;
+}
+
+/* ── Knowledge Base Panel ───────────────────────── */
+.kb-stats {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.kb-pill {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-secondary);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  padding: 2px 8px;
+  border-radius: 3px;
+}
+
+#doc-list { display: flex; flex-direction: column; gap: 2px; }
+
+.doc-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 8px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  transition: background 0.15s, border-color 0.15s;
+  cursor: default;
+  overflow: hidden;
+  max-height: 100px;
+}
+.doc-row:hover { background: var(--bg-elevated); border-color: var(--border); }
+
+.doc-name {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-code);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
+}
+
+.doc-delete-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  padding: 2px 4px;
+  border-radius: 3px;
+  transition: color 0.15s, background 0.15s;
+  flex-shrink: 0;
+  margin-left: 4px;
+  display: flex;
+  align-items: center;
+}
+.doc-delete-btn:hover { color: var(--red); background: var(--red-dim); }
+
+.doc-confirm {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  width: 100%;
+}
+.doc-confirm-yes {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  background: var(--red-dim);
+  border: 1px solid var(--red);
+  color: var(--red);
+  padding: 2px 6px;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.doc-confirm-yes:hover { background: var(--red); color: #fff; }
+.doc-confirm-no {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  padding: 2px 6px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+.doc-confirm-no:hover { border-color: var(--border-bright); color: var(--text-secondary); }
+
+.doc-row-deleting { opacity: 0.4; pointer-events: none; }
+.doc-row-exit {
+  max-height: 0 !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  margin: 0 !important;
+  opacity: 0;
+  border-color: transparent !important;
+  overflow: hidden;
+  transition: max-height 0.25s ease, opacity 0.25s ease, padding 0.25s ease;
+}
+
+.kb-empty {
+  border: 1px dashed var(--border-bright);
+  border-radius: 6px;
+  padding: 20px 12px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.kb-empty svg { margin-bottom: 8px; opacity: 0.4; }
+
+/* ── Center Panel ───────────────────────────────── */
+#center-panel {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  overflow: hidden;
+  padding: 0;
+  border-right: 1px solid var(--border);
+}
+
+.query-area {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-surface);
+}
+
+#query-input {
+  width: 100%;
+  background: var(--bg-input);
+  border: 1px solid var(--border-bright);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  padding: 10px 12px;
+  resize: none;
+  min-height: 72px;
+  max-height: 160px;
+  overflow-y: auto;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  line-height: 1.5;
+}
+#query-input::placeholder { color: var(--text-muted); }
+#query-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+.query-controls {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.advanced-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0;
+  transition: color 0.15s;
+  width: fit-content;
+}
+.advanced-toggle:hover { color: var(--text-secondary); }
+.advanced-toggle .chevron { transition: transform 0.2s; display: flex; }
+.advanced-toggle.open .chevron { transform: rotate(180deg); }
+
+.advanced-params {
+  display: none;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 12px;
+  padding: 12px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.advanced-params.open { display: grid; }
+
+.param-group { display: flex; flex-direction: column; gap: 6px; }
+.param-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.param-input-row { display: flex; align-items: center; gap: 6px; }
+.param-value {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--accent);
+  min-width: 28px;
+  text-align: right;
+}
+
+input[type=range] {
+  flex: 1;
+  -webkit-appearance: none;
+  height: 3px;
+  background: var(--border-bright);
+  border-radius: 2px;
+  outline: none;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  transition: transform 0.15s;
+}
+input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+
+input[type=number].param-number {
+  width: 52px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-bright);
+  border-radius: 4px;
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 3px 6px;
+  text-align: center;
+}
+input[type=number].param-number:focus { outline: none; border-color: var(--accent); }
+
+#submit-btn {
+  width: 100%;
+  background: var(--accent);
+  border: none;
+  border-radius: 6px;
+  color: #fff;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 500;
+  padding: 10px 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: background 0.15s, opacity 0.15s;
+}
+#submit-btn:hover:not(:disabled) { background: var(--accent-dim); }
+#submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ── Response Area ──────────────────────────────── */
+#response-area {
+  overflow-y: auto;
+  padding: 20px;
+}
+
+/* Empty state */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  text-align: center;
+  gap: 16px;
+  padding: 40px 20px;
+}
+.empty-state-icon { opacity: 0.2; }
+.empty-state-title {
+  font-size: 15px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+.empty-state-sub {
+  font-size: 13px;
+  color: var(--text-muted);
+  max-width: 340px;
+  line-height: 1.6;
+}
+.example-queries {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  max-width: 480px;
+}
+.example-pill {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-bright);
+  border-radius: 20px;
+  padding: 6px 14px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+  text-align: left;
+}
+.example-pill:hover {
+  border-color: var(--accent);
+  color: var(--text-primary);
+  background: var(--accent-glow);
+}
+
+/* Skeleton loading */
+.skeleton-wrap { display: flex; flex-direction: column; gap: 12px; padding: 4px 0; }
+.skeleton-block {
+  height: 14px;
+  background: linear-gradient(90deg, var(--bg-elevated) 25%, var(--bg-surface) 50%, var(--bg-elevated) 75%);
+  background-size: 200% 100%;
+  border-radius: 4px;
+  animation: shimmer 1.5s infinite;
+}
+@keyframes shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Result card */
+.result-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  animation: slideUp 0.3s ease-out;
+}
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.result-section {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.result-section:last-child { border-bottom: none; }
+
+.result-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.result-section-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.copy-btn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 3px 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: color 0.15s, border-color 0.15s;
+}
+.copy-btn:hover { color: var(--text-secondary); border-color: var(--border-bright); }
+.copy-btn.copied { color: var(--green); border-color: var(--green); }
+
+.answer-text {
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--text-primary);
+  white-space: pre-wrap;
+}
+.answer-truncated { max-height: 120px; overflow: hidden; position: relative; }
+.answer-truncated::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 48px;
+  background: linear-gradient(transparent, var(--bg-surface));
+}
+.show-more-btn {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 6px 0 0;
+  display: block;
+}
+.show-more-btn:hover { text-decoration: underline; }
+
+/* Sources */
+.sources-meta {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-left: 8px;
+}
+.source-cards { display: flex; flex-direction: column; gap: 8px; }
+
+.source-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: border-color 0.15s;
+  overflow: hidden;
+}
+.source-card:hover { border-color: var(--border-bright); }
+
+.source-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+.source-name {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-code);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
+}
+.source-score-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  margin-left: 8px;
+}
+.source-score {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+}
+.score-bar {
+  display: flex;
+  gap: 2px;
+}
+.score-block {
+  width: 6px;
+  height: 10px;
+  border-radius: 1px;
+  background: var(--border-bright);
+  transition: background 0.3s;
+}
+.score-block.filled { transition: background 0.4s; }
+
+.score-teal  { color: var(--teal); }
+.score-amber { color: var(--amber); }
+.score-red   { color: var(--red); }
+.block-teal  { background: var(--teal) !important; }
+.block-amber { background: var(--amber) !important; }
+.block-red   { background: var(--red) !important; }
+
+.source-excerpt {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.source-excerpt.expanded {
+  display: block;
+  -webkit-line-clamp: unset;
+  overflow: visible;
+}
+.source-chunk-id {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 5px;
+}
+
+/* Performance */
+.perf-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.perf-item { display: flex; flex-direction: column; gap: 2px; }
+.perf-value {
+  font-family: var(--font-mono);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.perf-value.fast   { color: var(--teal); }
+.perf-value.medium { color: var(--amber); }
+.perf-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.perf-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+.perf-meta span { display: flex; align-items: center; gap: 4px; }
+.perf-meta .dot { width: 4px; height: 4px; border-radius: 50%; background: var(--border-bright); }
+
+/* Recent queries */
+.recent-queries { margin-top: 16px; }
+.recent-list { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
+.recent-item {
+  font-size: 12px;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.recent-item:hover { color: var(--text-secondary); border-color: var(--border); background: var(--bg-elevated); }
+
+/* Error / warning cards */
+.msg-card {
+  border-radius: 6px;
+  padding: 12px 14px;
+  font-size: 13px;
+  line-height: 1.5;
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+.msg-card.error   { background: var(--red-dim);   border: 1px solid var(--red);   color: var(--text-primary); }
+.msg-card.warning { background: var(--amber-dim); border: 1px solid var(--amber); color: var(--text-primary); }
+.msg-card.success { background: var(--green-dim); border: 1px solid var(--green); color: var(--text-primary); }
+.msg-card-icon { flex-shrink: 0; margin-top: 1px; }
+
+/* ── Right Panel ────────────────────────────────── */
+.status-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 10px;
+}
+
+.status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.status-row:last-child { margin-bottom: 0; }
+.status-key {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.status-val {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-secondary);
+  text-align: right;
+  max-width: 130px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.provider-pill {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 2px 7px;
+  border-radius: 3px;
+  font-weight: 600;
+}
+.provider-openrouter { background: rgba(59,130,246,0.15); color: #60a5fa; border: 1px solid rgba(59,130,246,0.3); }
+.provider-openai     { background: rgba(34,197,94,0.12);  color: #4ade80; border: 1px solid rgba(34,197,94,0.3); }
+.provider-anthropic  { background: rgba(167,139,250,0.12); color: #c084fc; border: 1px solid rgba(167,139,250,0.3); }
+
+.chunk-count {
+  font-family: var(--font-mono);
+  font-size: 28px;
+  font-weight: 600;
+  color: var(--accent);
+  line-height: 1;
+  margin-bottom: 2px;
+}
+.chunk-sub {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.last-checked {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 8px;
+  text-align: right;
+}
+
+/* Ingest panel */
+.ingest-input {
+  width: 100%;
+  background: var(--bg-input);
+  border: 1px solid var(--border-bright);
+  border-radius: 5px;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 8px 10px;
+  margin-bottom: 4px;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.ingest-input::placeholder { color: var(--text-muted); }
+.ingest-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+.ingest-hint {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+#ingest-btn {
+  width: 100%;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-bright);
+  border-radius: 5px;
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 500;
+  padding: 8px 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+#ingest-btn:hover:not(:disabled) {
+  background: var(--accent-glow);
+  border-color: var(--accent);
+  color: var(--text-primary);
+}
+#ingest-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.ingest-result {
+  margin-top: 10px;
+  border-radius: 5px;
+  padding: 10px 12px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.ingest-result.success {
+  background: var(--green-dim);
+  border: 1px solid var(--green);
+  animation: fadeInOut 4s ease forwards;
+}
+.ingest-result.error {
+  background: var(--red-dim);
+  border: 1px solid var(--red);
+}
+@keyframes fadeInOut {
+  0%   { opacity: 0; }
+  10%  { opacity: 1; }
+  75%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+.ingest-stat {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--green);
+  display: flex;
+  justify-content: space-between;
+}
+.ingest-stat + .ingest-stat { margin-top: 3px; }
+
+/* Spinner */
+.spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255,255,255,0.2);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+.spinner.sm {
+  width: 10px;
+  height: 10px;
+  border-width: 1.5px;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Format badges */
+.format-note {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 6px;
+}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ── Header ── -->
+  <header id="header">
+    <div class="logo">
+      <svg class="logo-icon" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M14 2L4 7V14C4 19.5 8.5 24.5 14 26C19.5 24.5 24 19.5 24 14V7L14 2Z" fill="rgba(59,130,246,0.15)" stroke="#3b82f6" stroke-width="1.5" stroke-linejoin="round"/>
+        <path d="M10 14L13 17L18 11" stroke="#3b82f6" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span class="logo-text">PROCUREMENT RAG ENGINE</span>
+      <span class="version-badge">v1.0.0</span>
+    </div>
+    <div id="header-status">
+      <div class="status-dot unknown" id="header-dot"></div>
+      <span id="header-status-text">Connecting...</span>
+    </div>
+  </header>
+
+  <!-- ── Main ── -->
+  <div id="main">
+
+    <!-- Left: Knowledge Base -->
+    <div class="panel" id="left-panel">
+      <div class="panel-label">Knowledge Base</div>
+      <div class="kb-stats">
+        <span class="kb-pill" id="kb-doc-count">— docs</span>
+        <span class="kb-pill" id="kb-chunk-count">— chunks</span>
+      </div>
+      <div id="doc-list">
+        <div class="kb-empty">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+          </svg>
+          <div>No documents ingested.<br>Use the ingest panel to add<br>procurement documents.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Center: Query Workspace -->
+    <div id="center-panel">
+      <div class="query-area">
+        <textarea
+          id="query-input"
+          placeholder="Ask a question about your procurement documents…&#10;e.g. What are the DBE participation requirements?"
+          rows="3"
+        ></textarea>
+        <div class="query-controls">
+          <button class="advanced-toggle" id="advanced-toggle">
+            <span class="chevron">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5">
+                <polyline points="2 4 6 8 10 4"/>
+              </svg>
+            </span>
+            Advanced Parameters
+          </button>
+          <div class="advanced-params" id="advanced-params">
+            <div class="param-group">
+              <div class="param-label">Chunks to Retrieve</div>
+              <div class="param-input-row">
+                <input type="number" class="param-number" id="param-topk" value="5" min="1" max="20">
+              </div>
+            </div>
+            <div class="param-group">
+              <div class="param-label">Score Threshold</div>
+              <div class="param-input-row">
+                <input type="range" id="param-threshold" min="0" max="1" step="0.01" value="0.3">
+                <span class="param-value" id="param-threshold-val">0.30</span>
+              </div>
+            </div>
+            <div class="param-group">
+              <div class="param-label">Temperature</div>
+              <div class="param-input-row">
+                <input type="range" id="param-temp" min="0" max="1" step="0.1" value="0">
+                <span class="param-value" id="param-temp-val">0.0</span>
+              </div>
+            </div>
+          </div>
+          <button id="submit-btn" disabled>
+            <svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.5">
+              <circle cx="7.5" cy="7.5" r="6"/>
+              <polyline points="5 7.5 7.5 10 10 5"/>
+            </svg>
+            Query Documents
+          </button>
+        </div>
+      </div>
+
+      <div id="response-area">
+        <!-- empty state rendered by JS -->
+      </div>
+    </div>
+
+    <!-- Right: System Status + Ingest -->
+    <div class="panel" id="right-panel">
+      <div class="panel-label">System Status</div>
+
+      <div class="status-card">
+        <div class="status-row">
+          <span class="status-key">Status</span>
+          <span class="status-val" id="sys-status">—</span>
+        </div>
+        <div class="status-row">
+          <span class="status-key">Provider</span>
+          <span id="sys-provider">—</span>
+        </div>
+        <div class="status-row">
+          <span class="status-key">Model</span>
+          <span class="status-val" id="sys-model" title="">—</span>
+        </div>
+      </div>
+
+      <div class="status-card">
+        <div class="chunk-count" id="sys-chunks">—</div>
+        <div class="chunk-sub">Total Chunks Indexed</div>
+        <div class="last-checked" id="last-checked"></div>
+      </div>
+
+      <div class="divider"></div>
+      <div class="panel-label">Ingest Document</div>
+
+      <input
+        type="text"
+        class="ingest-input"
+        id="ingest-path"
+        placeholder="File path to ingest…"
+      >
+      <div class="ingest-hint">e.g. data/sample_docs/rfp_it_services.txt</div>
+      <button id="ingest-btn">
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.5">
+          <polyline points="6.5 2 6.5 9"/>
+          <polyline points="3 6 6.5 9.5 10 6"/>
+          <line x1="1" y1="11.5" x2="12" y2="11.5"/>
+        </svg>
+        Ingest File
+      </button>
+      <div class="format-note">Supports PDF · DOCX · TXT · MD · CSV</div>
+      <div id="ingest-result"></div>
+    </div>
+
+  </div><!-- /main -->
+</div><!-- /app -->
+
+<script>
+'use strict';
+
+// ── API ──────────────────────────────────────────────────────────────
+const API = {
+  BASE: '',
+  _controller: null,
+
+  async _fetch(method, path, body) {
+    if (method === 'POST' && path === '/query') {
+      if (this._controller) this._controller.abort();
+      this._controller = new AbortController();
+    }
+    try {
+      const opts = {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        signal: (method === 'POST' && path === '/query') ? this._controller.signal : undefined,
+      };
+      if (body !== undefined) opts.body = JSON.stringify(body);
+      const res = await fetch(this.BASE + path, opts);
+      if (!res.ok) {
+        let msg = `HTTP ${res.status}`;
+        try { const j = await res.json(); msg = j.detail || j.message || msg; } catch {}
+        return { data: null, error: { status: res.status, message: msg } };
+      }
+      const data = await res.json();
+      return { data, error: null };
+    } catch (e) {
+      if (e.name === 'AbortError') return { data: null, error: { status: 0, message: 'Request cancelled.' } };
+      return { data: null, error: { status: 0, message: 'Cannot connect to API. Is the server running?' } };
+    }
+  },
+
+  get(path)        { return this._fetch('GET', path); },
+  post(path, body) { return this._fetch('POST', path, body); },
+  del(path)        { return this._fetch('DELETE', path); },
+};
+
+// ── Health Poller ────────────────────────────────────────────────────
+const HealthPoller = {
+  _interval: null,
+  _lastPoll: null,
+  _tickInterval: null,
+
+  start() {
+    this.pollNow();
+    this._interval = setInterval(() => this.pollNow(), 30000);
+    this._tickInterval = setInterval(() => this._updateLastChecked(), 1000);
+  },
+
+  async pollNow() {
+    this._lastPoll = Date.now();
+    const { data, error } = await API.get('/health');
+    if (error || !data) {
+      UI.setHealth(null);
+    } else {
+      UI.setHealth(data);
+    }
+  },
+
+  _updateLastChecked() {
+    if (!this._lastPoll) return;
+    const s = Math.round((Date.now() - this._lastPoll) / 1000);
+    const el = document.getElementById('last-checked');
+    if (el) el.textContent = `Last checked ${s}s ago`;
+  },
+};
+
+// ── Document Manager ─────────────────────────────────────────────────
+const DocumentManager = {
+  async list() {
+    const { data, error } = await API.get('/documents');
+    if (!error && data) {
+      UI.renderDocumentList(data.sources || []);
+      UI.updateKBStats(data.unique_sources || 0, data.total_chunks || 0);
+    }
+  },
+
+  async delete(source, rowEl) {
+    rowEl.classList.add('doc-row-deleting');
+    const encoded = encodeURIComponent(source);
+    const { error } = await API.del(`/documents/${encoded}`);
+    if (error) {
+      rowEl.classList.remove('doc-row-deleting');
+      alert(`Delete failed: ${error.message}`);
+      return;
+    }
+    rowEl.style.maxHeight = rowEl.offsetHeight + 'px';
+    requestAnimationFrame(() => {
+      rowEl.classList.add('doc-row-exit');
+    });
+    rowEl.addEventListener('transitionend', () => {
+      rowEl.remove();
+      this.list();
+    }, { once: true });
+  },
+
+  async ingest(filePath) {
+    return API.post('/ingest/file', { file_path: filePath });
+  },
+};
+
+// ── Session History ───────────────────────────────────────────────────
+const SessionHistory = {
+  KEY: 'prag_history',
+  get() {
+    try { return JSON.parse(sessionStorage.getItem(this.KEY) || '[]'); } catch { return []; }
+  },
+  push(q) {
+    const h = this.get().filter(x => x !== q);
+    h.unshift(q);
+    sessionStorage.setItem(this.KEY, JSON.stringify(h.slice(0, 5)));
+  },
+  render() {
+    const h = this.get();
+    const container = document.getElementById('recent-queries');
+    if (!container) return;
+    if (!h.length) { container.style.display = 'none'; return; }
+    container.style.display = '';
+    const list = container.querySelector('.recent-list');
+    list.innerHTML = h.map(q =>
+      `<div class="recent-item" title="${escHtml(q)}">${escHtml(q)}</div>`
+    ).join('');
+    list.querySelectorAll('.recent-item').forEach((el, i) => {
+      el.addEventListener('click', () => {
+        document.getElementById('query-input').value = h[i];
+        updateSubmitBtn();
+      });
+    });
+  },
+};
+
+// ── UI ────────────────────────────────────────────────────────────────
+const UI = {
+  setHealth(data) {
+    const dot = document.getElementById('header-dot');
+    const txt = document.getElementById('header-status-text');
+    const sysSt = document.getElementById('sys-status');
+    const sysProvider = document.getElementById('sys-provider');
+    const sysModel = document.getElementById('sys-model');
+    const sysChunks = document.getElementById('sys-chunks');
+
+    if (!data) {
+      dot.className = 'status-dot error';
+      txt.textContent = 'Offline';
+      sysSt.textContent = 'Unreachable';
+      sysProvider.innerHTML = '—';
+      sysModel.textContent = '—';
+      sysChunks.textContent = '—';
+      return;
+    }
+
+    dot.className = 'status-dot healthy';
+    txt.textContent = 'System Online';
+    sysSt.textContent = data.status || 'healthy';
+
+    const prov = (data.llm_provider || '').toLowerCase();
+    const provClass = prov.includes('openrouter') ? 'provider-openrouter'
+                    : prov.includes('openai')      ? 'provider-openai'
+                    : prov.includes('anthropic')   ? 'provider-anthropic'
+                    : 'provider-openrouter';
+    sysProvider.innerHTML = `<span class="provider-pill ${provClass}">${escHtml(data.llm_provider || '—')}</span>`;
+
+    const model = data.llm_model || '—';
+    sysModel.textContent = model.length > 26 ? model.slice(0, 24) + '…' : model;
+    sysModel.title = model;
+
+    sysChunks.textContent = (data.total_chunks ?? '—').toLocaleString();
+  },
+
+  updateKBStats(docs, chunks) {
+    document.getElementById('kb-doc-count').textContent = `${docs} doc${docs !== 1 ? 's' : ''}`;
+    document.getElementById('kb-chunk-count').textContent = `${chunks.toLocaleString()} chunks`;
+  },
+
+  renderDocumentList(sources) {
+    const list = document.getElementById('doc-list');
+    if (!sources.length) {
+      list.innerHTML = `
+        <div class="kb-empty">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+          </svg>
+          <div>No documents ingested.<br>Use the ingest panel to add<br>procurement documents.</div>
+        </div>`;
+      return;
+    }
+
+    list.innerHTML = sources.map(src => {
+      const name = src.split('/').pop() || src;
+      return `
+        <div class="doc-row" data-source="${escHtml(src)}">
+          <span class="doc-name" title="${escHtml(src)}">${escHtml(name)}</span>
+          <button class="doc-delete-btn" title="Delete document">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5">
+              <polyline points="1 3 11 3"/>
+              <path d="M2 3l.7 7.3A1 1 0 0 0 3.7 11h4.6a1 1 0 0 0 1-.7L10 3"/>
+              <path d="M4.5 3V2a1 1 0 0 1 1-1h1a1 1 0 0 1 1 1v1"/>
+            </svg>
+          </button>
+        </div>`;
+    }).join('');
+
+    list.querySelectorAll('.doc-row').forEach(row => {
+      const deleteBtn = row.querySelector('.doc-delete-btn');
+      deleteBtn.addEventListener('click', () => {
+        const source = row.dataset.source;
+        row.innerHTML = `
+          <div class="doc-confirm">
+            <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;color:var(--text-muted)">${escHtml(source.split('/').pop())}</span>
+            <button class="doc-confirm-yes">Delete</button>
+            <button class="doc-confirm-no">Cancel</button>
+          </div>`;
+        row.querySelector('.doc-confirm-yes').addEventListener('click', () => {
+          DocumentManager.delete(source, row);
+        });
+        row.querySelector('.doc-confirm-no').addEventListener('click', () => {
+          DocumentManager.list();
+        });
+      });
+    });
+  },
+
+  showEmptyState() {
+    const area = document.getElementById('response-area');
+    area.innerHTML = `
+      <div class="empty-state">
+        <svg class="empty-state-icon" width="64" height="64" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.5">
+          <rect x="8" y="4" width="34" height="44" rx="3"/>
+          <line x1="16" y1="16" x2="34" y2="16"/>
+          <line x1="16" y1="24" x2="34" y2="24"/>
+          <line x1="16" y1="32" x2="28" y2="32"/>
+          <circle cx="46" cy="42" r="10"/>
+          <line x1="53" y1="49" x2="60" y2="56"/>
+        </svg>
+        <div class="empty-state-title">Ask your procurement documents anything</div>
+        <div class="empty-state-sub">Get grounded, source-cited answers from your indexed knowledge base.</div>
+        <div class="example-queries">
+          ${[
+            "What are the DBE participation requirements?",
+            "What insurance coverage is required?",
+            "What are the proposal submission deadlines?",
+            "What evaluation criteria are used for vendor selection?",
+            "What prevailing wage requirements apply to this contract?"
+          ].map(q => `<button class="example-pill">${escHtml(q)}</button>`).join('')}
+        </div>
+        <div class="recent-queries" id="recent-queries" style="display:none;width:100%;max-width:480px">
+          <div class="panel-label" style="text-align:left">Recent Queries</div>
+          <div class="recent-list"></div>
+        </div>
+      </div>`;
+
+    area.querySelectorAll('.example-pill').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const input = document.getElementById('query-input');
+        input.value = btn.textContent;
+        input.dispatchEvent(new Event('input'));
+        updateSubmitBtn();
+        input.focus();
+      });
+    });
+
+    SessionHistory.render();
+  },
+
+  showLoading() {
+    const area = document.getElementById('response-area');
+    area.innerHTML = `
+      <div class="skeleton-wrap">
+        <div class="skeleton-block" style="width:90%"></div>
+        <div class="skeleton-block" style="width:75%"></div>
+        <div class="skeleton-block" style="width:82%"></div>
+        <div class="skeleton-block" style="width:60%;margin-top:8px"></div>
+        <div class="skeleton-block" style="width:70%"></div>
+      </div>`;
+  },
+
+  showError(msg) {
+    const area = document.getElementById('response-area');
+    area.innerHTML = `
+      <div class="msg-card error">
+        <div class="msg-card-icon">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+            <circle cx="8" cy="8" r="7"/>
+            <line x1="8" y1="5" x2="8" y2="8.5"/>
+            <circle cx="8" cy="11" r="0.5" fill="currentColor"/>
+          </svg>
+        </div>
+        <div>${escHtml(msg)}</div>
+      </div>`;
+  },
+
+  showNoSources() {
+    const area = document.getElementById('response-area');
+    area.innerHTML = `
+      <div class="msg-card warning">
+        <div class="msg-card-icon">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M8 2L14.5 13H1.5L8 2Z"/>
+            <line x1="8" y1="7" x2="8" y2="10"/>
+            <circle cx="8" cy="12" r="0.5" fill="currentColor"/>
+          </svg>
+        </div>
+        <div>No relevant chunks found above the score threshold. Try lowering the Score Threshold in Advanced Parameters, or rephrase your question.</div>
+      </div>`;
+  },
+
+  renderResult(data) {
+    const area = document.getElementById('response-area');
+    const { answer, sources, performance, retrieval, model, provider } = data;
+
+    const answerLong = answer.length > 600;
+    const answerDisplay = answerLong ? answer.slice(0, 500) : answer;
+
+    const retMs = Math.round(performance.retrieval_time_ms);
+    const genMs = Math.round(performance.generation_time_ms);
+    const totMs = Math.round(performance.total_time_ms);
+
+    const fmtMs = ms => ms >= 1000
+      ? `${(ms/1000).toFixed(2)}s`
+      : `${ms}ms`;
+
+    const retClass  = retMs < 200  ? 'fast' : retMs < 500 ? 'medium' : '';
+    const genClass  = genMs < 2000 ? 'fast' : genMs < 5000 ? 'medium' : '';
+    const totClass  = totMs < 2200 ? 'fast' : totMs < 6000 ? 'medium' : '';
+
+    const sourcesHtml = sources.map(s => this._renderSourceCard(s)).join('');
+
+    area.innerHTML = `
+      <div class="result-card">
+
+        <div class="result-section">
+          <div class="result-section-header">
+            <span class="result-section-label">Answer</span>
+            <button class="copy-btn" id="copy-answer-btn">
+              <svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" stroke-width="1.5">
+                <rect x="4" y="4" width="6" height="6" rx="1"/>
+                <path d="M1 7V2a1 1 0 0 1 1-1h5"/>
+              </svg>
+              Copy
+            </button>
+          </div>
+          <div class="answer-text${answerLong ? ' answer-truncated' : ''}" id="answer-body">${escHtml(answer)}</div>
+          ${answerLong ? `<button class="show-more-btn" id="show-more-btn">Show more ↓</button>` : ''}
+        </div>
+
+        <div class="result-section">
+          <div class="result-section-header">
+            <span class="result-section-label">Sources <span class="sources-meta">${retrieval.chunks_used} of ${retrieval.chunks_retrieved} retrieved</span></span>
+          </div>
+          <div class="source-cards">${sourcesHtml}</div>
+        </div>
+
+        <div class="result-section">
+          <div class="result-section-header">
+            <span class="result-section-label">Performance</span>
+          </div>
+          <div class="perf-grid">
+            <div class="perf-item">
+              <span class="perf-value ${retClass}">${fmtMs(retMs)}</span>
+              <span class="perf-label">Retrieval</span>
+            </div>
+            <div class="perf-item">
+              <span class="perf-value ${genClass}">${fmtMs(genMs)}</span>
+              <span class="perf-label">Generation</span>
+            </div>
+            <div class="perf-item">
+              <span class="perf-value ${totClass}">${fmtMs(totMs)}</span>
+              <span class="perf-label">Total</span>
+            </div>
+          </div>
+          <div class="perf-meta">
+            <span>${retrieval.chunks_retrieved} retrieved <span class="dot"></span> ${retrieval.chunks_used} used</span>
+            <span><span class="dot"></span> ${escHtml(model)}</span>
+            <span><span class="dot"></span> ${escHtml(provider)}</span>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="recent-queries" id="recent-queries" style="display:none;margin-top:16px">
+        <div class="panel-label">Recent Queries</div>
+        <div class="recent-list"></div>
+      </div>`;
+
+    // Copy button
+    document.getElementById('copy-answer-btn').addEventListener('click', () => {
+      navigator.clipboard.writeText(answer).then(() => {
+        const btn = document.getElementById('copy-answer-btn');
+        btn.classList.add('copied');
+        btn.innerHTML = `<svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="1.5 6 4 8.5 9.5 3"/></svg> Copied`;
+        setTimeout(() => {
+          btn.classList.remove('copied');
+          btn.innerHTML = `<svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="4" y="4" width="6" height="6" rx="1"/><path d="M1 7V2a1 1 0 0 1 1-1h5"/></svg> Copy`;
+        }, 2000);
+      });
+    });
+
+    // Show more/less
+    if (answerLong) {
+      let expanded = false;
+      const btn = document.getElementById('show-more-btn');
+      const body = document.getElementById('answer-body');
+      btn.addEventListener('click', () => {
+        expanded = !expanded;
+        if (expanded) {
+          body.classList.remove('answer-truncated');
+          btn.textContent = 'Show less ↑';
+        } else {
+          body.classList.add('answer-truncated');
+          btn.textContent = 'Show more ↓';
+        }
+      });
+    }
+
+    // Source card expand/collapse
+    area.querySelectorAll('.source-card').forEach(card => {
+      card.addEventListener('click', () => {
+        const excerpt = card.querySelector('.source-excerpt');
+        excerpt.classList.toggle('expanded');
+      });
+    });
+
+    // Animate score bars
+    setTimeout(() => {
+      area.querySelectorAll('.score-block.filled').forEach(block => {
+        const color = block.dataset.color;
+        if (color === 'teal')  block.classList.add('block-teal');
+        if (color === 'amber') block.classList.add('block-amber');
+        if (color === 'red')   block.classList.add('block-red');
+      });
+    }, 80);
+
+    SessionHistory.render();
+  },
+
+  _renderSourceCard(s) {
+    const score = s.score || 0;
+    const scoreClass = score >= 0.7 ? 'score-teal' : score >= 0.4 ? 'score-amber' : 'score-red';
+    const colorName  = score >= 0.7 ? 'teal'       : score >= 0.4 ? 'amber'       : 'red';
+    const filled = Math.round(score * 5);
+    const blocks = Array.from({ length: 5 }, (_, i) =>
+      i < filled
+        ? `<div class="score-block filled" data-color="${colorName}"></div>`
+        : `<div class="score-block"></div>`
+    ).join('');
+    const name = (s.source || '').split('/').pop() || s.source || '—';
+    const excerpt = s.excerpt || '';
+    return `
+      <div class="source-card">
+        <div class="source-card-header">
+          <span class="source-name" title="${escHtml(s.source)}">${escHtml(name)}</span>
+          <div class="source-score-wrap">
+            <span class="source-score ${scoreClass}">${score.toFixed(3)}</span>
+            <div class="score-bar">${blocks}</div>
+          </div>
+        </div>
+        <div class="source-excerpt">${escHtml(excerpt)}</div>
+        ${s.chunk_id ? `<div class="source-chunk-id">${escHtml(s.chunk_id)}</div>` : ''}
+      </div>`;
+  },
+};
+
+// ── Helpers ──────────────────────────────────────────────────────────
+function escHtml(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function updateSubmitBtn() {
+  const btn = document.getElementById('submit-btn');
+  const val = document.getElementById('query-input').value.trim();
+  btn.disabled = !val;
+}
+
+// ── Init ─────────────────────────────────────────────────────────────
+function initApp() {
+  // Auto-grow textarea
+  const textarea = document.getElementById('query-input');
+  textarea.addEventListener('input', () => {
+    textarea.style.height = 'auto';
+    const capped = Math.min(textarea.scrollHeight, 160);
+    textarea.style.height = capped + 'px';
+    updateSubmitBtn();
+  });
+
+  // Cmd/Ctrl+Enter to submit
+  textarea.addEventListener('keydown', e => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+      e.preventDefault();
+      const btn = document.getElementById('submit-btn');
+      if (!btn.disabled) btn.click();
+    }
+  });
+
+  // Advanced params toggle
+  document.getElementById('advanced-toggle').addEventListener('click', () => {
+    const toggle = document.getElementById('advanced-toggle');
+    const params = document.getElementById('advanced-params');
+    toggle.classList.toggle('open');
+    params.classList.toggle('open');
+  });
+
+  // Range slider live values
+  document.getElementById('param-threshold').addEventListener('input', e => {
+    document.getElementById('param-threshold-val').textContent = parseFloat(e.target.value).toFixed(2);
+  });
+  document.getElementById('param-temp').addEventListener('input', e => {
+    document.getElementById('param-temp-val').textContent = parseFloat(e.target.value).toFixed(1);
+  });
+
+  // Submit query
+  document.getElementById('submit-btn').addEventListener('click', async () => {
+    const query = textarea.value.trim();
+    if (!query) return;
+
+    const btn = document.getElementById('submit-btn');
+    btn.disabled = true;
+    btn.innerHTML = `<div class="spinner"></div> Querying…`;
+
+    UI.showLoading();
+
+    const topK       = parseInt(document.getElementById('param-topk').value, 10) || 5;
+    const threshold  = parseFloat(document.getElementById('param-threshold').value);
+    const temp       = parseFloat(document.getElementById('param-temp').value);
+
+    const { data, error } = await API.post('/query', {
+      query,
+      top_k: topK,
+      score_threshold: threshold,
+      temperature: temp,
+    });
+
+    btn.disabled = false;
+    btn.innerHTML = `
+      <svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.5">
+        <circle cx="7.5" cy="7.5" r="6"/>
+        <polyline points="5 7.5 7.5 10 10 5"/>
+      </svg>
+      Query Documents`;
+    updateSubmitBtn();
+
+    if (error) {
+      UI.showError(error.message);
+      return;
+    }
+
+    if (!data.sources || data.sources.length === 0) {
+      UI.showNoSources();
+      return;
+    }
+
+    SessionHistory.push(query);
+    UI.renderResult(data);
+  });
+
+  // Ingest
+  document.getElementById('ingest-btn').addEventListener('click', async () => {
+    const pathInput = document.getElementById('ingest-path');
+    const filePath = pathInput.value.trim();
+    if (!filePath) { pathInput.focus(); return; }
+
+    const btn = document.getElementById('ingest-btn');
+    btn.disabled = true;
+    btn.innerHTML = `<div class="spinner sm"></div> Ingesting…`;
+    const resultEl = document.getElementById('ingest-result');
+    resultEl.innerHTML = '';
+
+    const { data, error } = await DocumentManager.ingest(filePath);
+
+    btn.disabled = false;
+    btn.innerHTML = `
+      <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.5">
+        <polyline points="6.5 2 6.5 9"/>
+        <polyline points="3 6 6.5 9.5 10 6"/>
+        <line x1="1" y1="11.5" x2="12" y2="11.5"/>
+      </svg>
+      Ingest File`;
+
+    if (error) {
+      resultEl.innerHTML = `<div class="msg-card error" style="font-size:12px;padding:8px 10px">${escHtml(error.message)}</div>`;
+      return;
+    }
+
+    const stats = data.stats || {};
+    resultEl.innerHTML = `
+      <div class="ingest-result success">
+        <div class="ingest-stat"><span>Chunks created</span><span>${stats.chunk_count ?? '—'}</span></div>
+        <div class="ingest-stat"><span>Words</span><span>${(stats.word_count ?? 0).toLocaleString()}</span></div>
+        <div class="ingest-stat"><span>Avg chunk</span><span>${stats.avg_chunk_size ?? '—'} chars</span></div>
+      </div>`;
+
+    pathInput.value = '';
+    setTimeout(() => { resultEl.innerHTML = ''; }, 4200);
+    DocumentManager.list();
+    HealthPoller.pollNow();
+  });
+
+  // Initial data load
+  UI.showEmptyState();
+  HealthPoller.start();
+  DocumentManager.list();
+}
+
+document.addEventListener('DOMContentLoaded', initApp);
+</script>
+</body>
+</html>

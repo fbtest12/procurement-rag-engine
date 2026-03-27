@@ -17,10 +17,13 @@ COPY . .
 # Create data directories
 RUN mkdir -p data/chromadb data/sample_docs
 
+# Make entrypoint executable
+RUN chmod +x entrypoint.sh
+
 EXPOSE 8000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"
 
-CMD ["uvicorn", "src.api.app:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["./entrypoint.sh"]

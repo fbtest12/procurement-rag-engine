@@ -11,10 +11,14 @@ Designed for deployment behind a reverse proxy in production.
 """
 
 import logging
+import os
 from contextlib import asynccontextmanager
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException, UploadFile, File
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from src.llm.factory import create_llm_provider
@@ -132,6 +136,21 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    static_dir = os.path.join(os.path.dirname(__file__), "..", "..", "static")
+    if os.path.isdir(static_dir):
+        app.mount("/static", StaticFiles(directory=static_dir), name="static")
+
+        @app.get("/", include_in_schema=False)
+        async def serve_ui():
+            return FileResponse(os.path.join(static_dir, "index.html"))
+
     # ── Endpoints ────────────────────────────────────────────
 
     @app.get("/health", response_model=HealthResponse)
@@ -222,7 +241,7 @@ def create_app() -> FastAPI:
         stats = await store.get_collection_stats()
         return stats
 
-    @app.delete("/documents/{source}")
+    @app.delete("/documents/{source:path}")
     async def delete_document(source: str):
         """Remove all chunks from a specific source document."""
         store: ChromaVectorStore = state["vector_store"]
