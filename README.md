@@ -50,6 +50,7 @@ procurement-rag-engine/
 │   │   ├── base.py             # Abstract LLMProvider + LLMResponse
 │   │   ├── openai_provider.py  # OpenAI GPT implementation
 │   │   ├── anthropic_provider.py # Anthropic Claude implementation
+│   │   ├── openrouter_provider.py # OpenRouter implementation
 │   │   └── factory.py          # Provider factory
 │   ├── ingestion/              # Document processing pipeline
 │   │   ├── loader.py           # Multi-format document loader (PDF, DOCX, TXT)
@@ -176,7 +177,7 @@ These are deliberate scope boundaries for an MVP, not oversights:
 - **Python 3.11** — Core language
 - **FastAPI** — Async REST API framework
 - **ChromaDB** — Embedded vector database (swappable via abstract interface)
-- **OpenAI / Anthropic** — LLM providers (provider-agnostic architecture)
+- **OpenAI / Anthropic / OpenRouter** — LLM providers (provider-agnostic architecture)
 - **PyMuPDF** — PDF text extraction
 - **sentence-transformers** — Document embeddings
 - **Docker** — Containerized deployment
